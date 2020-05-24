@@ -27,6 +27,7 @@ fn report(report: &rocket::http::RawStr) -> rocket_contrib::templates::Template 
     };
     context.insert("title", format!("{} report", report_name));
     context.insert("txt", tasks);
+    // TODO bundle templates, see https://github.com/SergioBenitez/Rocket/issues/943
     rocket_contrib::templates::Template::render("layout", &context)
 }
 
@@ -41,6 +42,8 @@ fn asset_favicon<'r>() -> rocket::response::Result<'r> {
 
 #[get("/static/<path..>")]
 fn asset<'r>(path: std::path::PathBuf) -> rocket::response::Result<'r> {
+    // TODO 304 not modified
+
     let filepath = path
         .clone()
         .into_os_string()
