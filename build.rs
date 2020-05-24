@@ -11,5 +11,9 @@ fn main() -> anyhow::Result<()> {
         "https://taskwarrior.org/images/favicon.ico",
         "assets/favicon.ico",
     )?;
+    download(
+        "https://andybrewer.github.io/mvp/mvp.css",
+        "assets/mvp.css",
+    )?;
     Ok(())
 }
