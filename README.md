@@ -25,8 +25,8 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 ### Technical goals
 
 * application is a single binary, with everything (including assets) in it
-* do one thing, and do it well: get configuration from `~/.taskrc` and offer a convenient UI to interact with tasks though the `task` binary, everything else is out of scope
-* minimalist use of presentation layer for simplicity and performance:
+* do one thing, and do it well: get configuration from the usual `~/.taskrc` and offer a convenient UI to interact with tasks though the `task` binary, everything else is out of scope
+* minimalist presentation layer for simplicity and performance:
     * use plain HTML as much as possible, with semantic elements
     * use JavaScript only when absolutely necessary (ideally under 10 lines of code, to trigger updates)
     * minimal use of CSS, with a ["drop in" stylesheet](https://github.com/dohliam/dropin-minimal-css#list-of-frameworks)

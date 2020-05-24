@@ -11,13 +11,23 @@ mod tw;
 //
 
 #[get("/")]
-fn report_default() -> Option<String> {
+fn report_default() -> rocket_contrib::templates::Template {
     report(rocket::http::RawStr::from_str(""))
 }
 
 #[get("/<report>")]
-fn report(report: &rocket::http::RawStr) -> Option<String> {
-    tw::report(report).ok()
+fn report(report: &rocket::http::RawStr) -> rocket_contrib::templates::Template {
+    let tasks = tw::report(report).unwrap();  // TODO propagate error
+    let mut context = std::collections::HashMap::new();
+    let report_name = if report.is_empty() {
+        "Default"
+    }
+    else {
+        report
+    };
+    context.insert("title", format!("{} report", report_name));
+    context.insert("txt", tasks);
+    rocket_contrib::templates::Template::render("layout", &context)
 }
 
 //
@@ -61,6 +71,7 @@ fn asset<'r>(path: std::path::PathBuf) -> rocket::response::Result<'r> {
 
 fn main() {
     rocket::ignite()
+        .attach(rocket_contrib::templates::Template::fairing())
         .mount("/", routes![report_default, report, asset_favicon, asset])
         .launch();
 }
