@@ -11,13 +11,13 @@ mod tw;
 //
 
 #[get("/")]
-fn report_default() -> rocket_contrib::templates::Template {
+fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
     report(rocket::http::RawStr::from_str(""))
 }
 
 #[get("/<report>")]
-fn report(report: &rocket::http::RawStr) -> rocket_contrib::templates::Template {
-    let tasks = tw::report(report).unwrap();  // TODO propagate error
+fn report(report: &rocket::http::RawStr) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
+    let tasks = tw::report(report).or_else(|_| Err(rocket::http::Status::NotFound))?;
     let mut context = std::collections::HashMap::new();
     let report_name = if report.is_empty() {
         "Default"
@@ -28,7 +28,7 @@ fn report(report: &rocket::http::RawStr) -> rocket_contrib::templates::Template 
     context.insert("title", format!("{} report", report_name));
     context.insert("txt", tasks);
     // TODO bundle templates, see https://github.com/SergioBenitez/Rocket/issues/943
-    rocket_contrib::templates::Template::render("layout", &context)
+    Ok(rocket_contrib::templates::Template::render("layout", &context))
 }
 
 //
