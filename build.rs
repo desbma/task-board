@@ -11,9 +11,11 @@ fn main() -> anyhow::Result<()> {
         "https://taskwarrior.org/images/favicon.ico",
         "assets/favicon.ico",
     )?;
-    download(
-        "https://andybrewer.github.io/mvp/mvp.css",
-        "assets/mvp.css",
-    )?;
+    download("https://andybrewer.github.io/mvp/mvp.css", "assets/mvp.css")?;
+    let now = std::time::SystemTime::now();
+    println!(
+        "cargo:rustc-env=BUILD_DATETIME_HTTP_LAST_MODIFIED={}",
+        httpdate::fmt_http_date(now)
+    );
     Ok(())
 }

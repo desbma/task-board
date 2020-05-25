@@ -4,7 +4,7 @@
         <meta charset="utf-8"/>
         <title>{{title}} | Task Board</title>
         <link rel="stylesheet" href="/static/mvp.css">
-        <link rel="shortcut icon" href="/favicon.ico"/>
+        <link rel="shortcut icon" href="/static/favicon.ico"/>
     </head>
     <body>
         <header>
