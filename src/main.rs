@@ -13,6 +13,12 @@ mod tw;
 // Reports
 //
 
+#[derive(serde::Serialize)]
+struct TemplateContext {
+    title: String,
+    tasks: Vec<tw::Task>,
+}
+
 #[get("/")]
 fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
     report(rocket::http::RawStr::from_str(""))
@@ -22,11 +28,12 @@ fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http:
 fn report(
     report: &rocket::http::RawStr,
 ) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    let tasks = tw::report(report).or_else(|_| Err(rocket::http::Status::NotFound))?;
-    let mut context = std::collections::HashMap::new();
     let report_name = if report.is_empty() { "Default" } else { report };
-    context.insert("title", format!("{} report", report_name));
-    context.insert("txt", tasks);
+    let tasks = tw::report(report).or_else(|_| Err(rocket::http::Status::NotFound))?;
+    let context = TemplateContext {
+        title: format!("{} report", report_name),
+        tasks,
+    };
     // TODO bundle templates, see https://github.com/SergioBenitez/Rocket/issues/943
     Ok(rocket_contrib::templates::Template::render(
         "layout", &context,

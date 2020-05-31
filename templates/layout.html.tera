@@ -10,9 +10,18 @@
         <header>
             <h1>{{title}}</h1>
         </header>
-        <pre>{{txt}}</pre>
+        <table>
+        {% for task in tasks %}
+            <tr>
+            {% for column in task.columns %}
+                <td>{{column}}</td>
+            {% endfor %}
+            </tr>
+        {% endfor %}
+        </table>
         <footer>
 
         </footer>
+        <!--<script src="https://dohliam.github.io/dropin-minimal-css/switcher.js" type="text/javascript"></script>-->
     </body>
 </html>
