@@ -7,9 +7,7 @@ static READ_ONLY_OPTS: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
 
 pub fn report(report: &str) -> anyhow::Result<Vec<Task>> {
     let mut args: Vec<&str> = READ_ONLY_OPTS.to_vec();
-    if !report.is_empty() {
-        args.push(report);
-    };
+    args.push(report);
     let output = std::process::Command::new("task").args(&args).output()?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
@@ -19,7 +17,8 @@ pub fn report(report: &str) -> anyhow::Result<Vec<Task>> {
     }
 
     // TODO rewrite with this logic:
-    // * get report column names & types
+    // * run & parse task show report.next.columns
+    // * run & parse task show report.next.labels
     // * get uuids
     // * use export as json, or _get to fetch columns values
 

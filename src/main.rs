@@ -21,17 +21,16 @@ struct TemplateContext {
 
 #[get("/")]
 fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    report(rocket::http::RawStr::from_str(""))
+    report(rocket::http::RawStr::from_str("next")) // TODO get default report dynamically?
 }
 
 #[get("/<report>")]
 fn report(
     report: &rocket::http::RawStr,
 ) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    let report_name = if report.is_empty() { "Default" } else { report };
     let tasks = tw::report(report).or_else(|_| Err(rocket::http::Status::NotFound))?;
     let context = TemplateContext {
-        title: format!("{} report", report_name),
+        title: format!("{} report", report),
         tasks,
     };
     // TODO bundle templates, see https://github.com/SergioBenitez/Rocket/issues/943
