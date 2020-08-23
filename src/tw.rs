@@ -1,9 +1,28 @@
 #[derive(serde::Serialize)]
-pub struct Task {
-    columns: Vec<String>,
+enum ColumnType {
+    _DateTime,
+    String,
+    _Urgency,
 }
 
-static READ_ONLY_OPTS: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
+type TaskLine = Vec<String>;
+
+#[derive(serde::Serialize)]
+pub struct Report {
+    column_types: Vec<ColumnType>,
+    labels: Vec<String>,
+    tasks: Vec<TaskLine>,
+}
+
+static READ_ONLY_OPTS: [&str; 3] = ["rc.recurrence:no", "rc.gc:off", "rc.verbose=label"];
+
+fn column_label_to_type(
+    _label: &str,
+    _label2column: &std::collections::HashMap<String, String>,
+) -> anyhow::Result<ColumnType> {
+    // TODO
+    Ok(ColumnType::String)
+}
 
 fn invoke(args: &[&str]) -> anyhow::Result<String> {
     let mut cmd_args: Vec<&str> = READ_ONLY_OPTS.to_vec();
@@ -43,24 +62,85 @@ fn show(what: &str) -> anyhow::Result<Vec<String>> {
     Err(anyhow::anyhow!("Unexpected output for {:?}", args))
 }
 
-pub fn report(report: &str) -> anyhow::Result<Vec<Task>> {
+pub fn report(report: &str) -> anyhow::Result<Report> {
     let args = vec![report];
     let output = invoke(&args)?;
 
-    let columns = show(&format!("report.{}.columns", report))?;
-    println!("{:?}", columns);
-    let labels = show(&format!("report.{}.labels", report))?;
-    println!("{:?}", labels);
+    // TODO cache this until taskrc is changed
+    // TODO run this in parallel
+    let report_columns = show(&format!("report.{}.columns", report))?;
+    println!("{:?}", report_columns);
 
-    // TODO
-    // * get uuids
-    // * use export as json, or _get to fetch columns values
+    let report_labels = show(&format!("report.{}.labels", report))?;
+    println!("{:?}", report_labels);
+    assert!(report_labels.len() == report_columns.len());
 
-    let mut tasks = Vec::new();
-    for line in output.lines() {
-        tasks.push(Task {
-            columns: line.split_whitespace().map(String::from).collect(),
-        })
+    let mut report_output_lines = output.lines();
+
+    // Build a hashmap of label -> column
+    let mut label2column: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    for (label, column) in report_labels.iter().zip(report_columns.iter()) {
+        label2column.insert(label.to_string(), column.to_string());
     }
-    Ok(tasks)
+
+    // Compute offset for each column from first report line (labels), and also get used labels
+    let label_line = report_output_lines
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get report column labels"))?;
+    report_output_lines.next(); // Drop line after label made of - chars
+    let mut char_is_in_label = true;
+    let mut column_char_offsets = Vec::new();
+    column_char_offsets.push(0);
+    let mut present_labels = Vec::new();
+    let mut cur_label = String::new();
+    for (line_offset, c) in label_line.chars().enumerate() {
+        if c.is_ascii_whitespace() {
+            if char_is_in_label {
+                present_labels.push(cur_label.clone());
+                cur_label.clear();
+                char_is_in_label = false;
+            }
+        } else {
+            if !char_is_in_label {
+                char_is_in_label = true;
+                column_char_offsets.push(line_offset);
+            }
+            cur_label.push(c);
+        }
+    }
+    if !cur_label.is_empty() {
+        present_labels.push(cur_label);
+    }
+
+    // Split lines at column offsets
+    let mut report_tasks: Vec<TaskLine> = Vec::new();
+    for report_output_line in report_output_lines {
+        let mut task_line = TaskLine::new();
+        task_line.reserve(column_char_offsets.len());
+
+        for cur_column_char_offsets in column_char_offsets.windows(2) {
+            let chunk = &report_output_line[cur_column_char_offsets[0]..cur_column_char_offsets[1]];
+            task_line.push(String::from(chunk));
+        }
+
+        let last_chunk_start: usize = *column_char_offsets.last().unwrap();
+        let last_chunk = &report_output_line[last_chunk_start..report_output_line.len()];
+        task_line.push(last_chunk.to_string());
+
+        assert!(task_line.len() == column_char_offsets.len());
+        report_tasks.push(task_line);
+    }
+
+    // Get column types from present labels
+    let column_types: Vec<ColumnType> = present_labels
+        .iter()
+        .map(|c| column_label_to_type(c, &label2column).unwrap()) // TODO remove unwrap
+        .collect();
+
+    Ok(Report {
+        column_types,
+        labels: present_labels,
+        tasks: report_tasks,
+    })
 }

@@ -11,10 +11,13 @@
             <h1>{{title}}</h1>
         </header>
         <table>
-        {% for task in tasks %}
+        {% for label in report.labels %}
+            <th>{{label}}</th>
+        {% endfor %}
+        {% for task in report.tasks %}
             <tr>
-            {% for column in task.columns %}
-                <td>{{column}}</td>
+            {% for attribute in task %}
+                <td>{{attribute}}</td>
             {% endfor %}
             </tr>
         {% endfor %}

@@ -16,7 +16,7 @@ mod tw;
 #[derive(serde::Serialize)]
 struct TemplateContext {
     title: String,
-    tasks: Vec<tw::Task>,
+    report: tw::Report,
 }
 
 #[get("/")]
@@ -24,14 +24,14 @@ fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http:
     report(rocket::http::RawStr::from_str("next")) // TODO get default report dynamically?
 }
 
-#[get("/<report>")]
+#[get("/<report_name>")]
 fn report(
-    report: &rocket::http::RawStr,
+    report_name: &rocket::http::RawStr,
 ) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    let tasks = tw::report(report).or_else(|_| Err(rocket::http::Status::NotFound))?;
+    let report = tw::report(report_name).or_else(|_| Err(rocket::http::Status::NotFound))?;
     let context = TemplateContext {
-        title: format!("{} report", report),
-        tasks,
+        title: format!("{} report", report_name),
+        report,
     };
     // TODO bundle templates, see https://github.com/SergioBenitez/Rocket/issues/943
     Ok(rocket_contrib::templates::Template::render(
