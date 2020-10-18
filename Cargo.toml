@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["desbma <desbma@users.noreply.github.com>"]
 edition = "2018"
 
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
 [build-dependencies]
 anyhow = "1.0"
 httpdate = "0.3"
