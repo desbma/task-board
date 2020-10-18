@@ -26,6 +26,7 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 
 * Application is a single binary, with everything (including assets) in it.
 * Do one thing, and do it well: get configuration from the usual `~/.taskrc` and offer a convenient UI to interact with tasks though the `task` binary, everything else is out of scope. In other words, **this is a frontend to the `task` Taskwarrior command line tool, rather than a frontend to Taskwarrior tasks using a different model.**
+**This means all your customization in `~/.taskrc` that affects report output, priorities, etc. is respected.**
 * Minimalist presentation layer for simplicity and performance:
     * Use plain HTML as much as possible, with semantic elements.
     * Use JavaScript only when absolutely necessary (ideally under 10 lines of code, to trigger updates).
@@ -38,7 +39,7 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 
 ### Done
 
-**Nothing**
+* report display
 
 ### TODO
 
