@@ -121,12 +121,12 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
 
         for cur_column_char_offsets in column_char_offsets.windows(2) {
             let chunk = &report_output_line[cur_column_char_offsets[0]..cur_column_char_offsets[1]];
-            task_line.push(String::from(chunk));
+            task_line.push(chunk.trim().to_string());
         }
 
         let last_chunk_start: usize = *column_char_offsets.last().unwrap();
-        let last_chunk = &report_output_line[last_chunk_start..report_output_line.len()];
-        task_line.push(last_chunk.to_string());
+        let last_chunk = &report_output_line[last_chunk_start..];
+        task_line.push(last_chunk.trim().to_string());
 
         assert!(task_line.len() == column_char_offsets.len());
         report_tasks.push(task_line);
