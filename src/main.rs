@@ -7,8 +7,9 @@ extern crate lazy_static;
 extern crate rocket;
 
 mod assets;
+#[cfg(test)]
+mod test;
 mod tw;
-#[cfg(test)] mod test;
 
 //
 // Reports
