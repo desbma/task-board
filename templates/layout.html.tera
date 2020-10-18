@@ -12,16 +12,22 @@
             <!-- TODO dropdown reports / shell -->
         </header>
         <table>
-        {%- for label in report.labels %}
-            <th>{{label}}</th>
-        {%- endfor %}
-        {%- for task in report.tasks %}
-            <tr>
-            {%- for attribute in task %}
-                <td class="{{report.column_types[loop.index0] | column_class}}">{{attribute}}</td>
+            <thead>
+                <tr>
+                {%- for label in report.labels %}
+                    <th>{{label}}</th>
+                {%- endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            {%- for task in report.tasks %}
+                <tr>
+                {%- for attribute in task %}
+                    <td class="{{report.column_types[loop.index0] | column_class}}">{{attribute}}</td>
+                {%- endfor %}
+                </tr>
             {%- endfor %}
-            </tr>
-        {%- endfor %}
+            </tbody>
         </table>
         <footer>
 
