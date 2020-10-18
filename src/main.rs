@@ -74,12 +74,42 @@ fn asset(path: std::path::PathBuf, last_mod: assets::IfModified) -> rocket::resp
 fn not_modified(_req: &rocket::request::Request) {}
 
 //
+// Tera custom filters
+//
+
+lazy_static! {
+    static ref COLUMN_TO_CLASS: std::collections::HashMap<String, String> = {
+        let mut m = std::collections::HashMap::new();
+        m.insert(tw::ColumnType::_DateTime.to_string(), "dt".to_string());
+        m.insert(tw::ColumnType::String.to_string(), "str".to_string());
+        m.insert(tw::ColumnType::ReadOnly.to_string(), "ro".to_string());
+        m
+    };
+}
+
+fn column_class(
+    column: rocket_contrib::templates::tera::Value,
+    _args: std::collections::HashMap<String, rocket_contrib::templates::tera::Value>,
+) -> rocket_contrib::templates::tera::Result<rocket_contrib::templates::tera::Value> {
+    let s =
+        rocket_contrib::templates::tera::try_get_value!("column_class", "value", String, column);
+    let r = COLUMN_TO_CLASS
+        .get(&s)
+        .ok_or_else(|| format!("Unknown column {}", s))?;
+    Ok(rocket_contrib::templates::tera::to_value(r).unwrap())
+}
+
+//
 // Main
 //
 
 fn main() {
     rocket::ignite()
-        .attach(rocket_contrib::templates::Template::fairing())
+        .attach(rocket_contrib::templates::Template::custom(
+            |engines: &mut rocket_contrib::templates::Engines| {
+                engines.tera.register_filter("column_class", column_class);
+            },
+        ))
         .mount("/", routes![report_default, report, asset])
         .register(catchers![not_modified])
         .launch();

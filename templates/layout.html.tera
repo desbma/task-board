@@ -11,16 +11,16 @@
             <h1>{{title}}</h1>
         </header>
         <table>
-        {% for label in report.labels %}
+        {%- for label in report.labels %}
             <th>{{label}}</th>
-        {% endfor %}
-        {% for task in report.tasks %}
+        {%- endfor %}
+        {%- for task in report.tasks %}
             <tr>
-            {% for attribute in task %}
-                <td>{{attribute}}</td>
-            {% endfor %}
+            {%- for attribute in task %}
+                <td class="{{report.column_types[loop.index0] | column_class}}">{{attribute}}</td>
+            {%- endfor %}
             </tr>
-        {% endfor %}
+        {%- endfor %}
         </table>
         <footer>
 

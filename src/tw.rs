@@ -1,8 +1,8 @@
-#[derive(serde::Serialize)]
-enum ColumnType {
+#[derive(Debug, serde::Serialize, strum_macros::ToString)]
+pub enum ColumnType {
     _DateTime,
     String,
-    _Urgency,
+    ReadOnly,
 }
 
 type TaskLine = Vec<String>;
@@ -14,14 +14,31 @@ pub struct Report {
     tasks: Vec<TaskLine>,
 }
 
+lazy_static! {
+    static ref READ_ONLY_COLUMNS: std::collections::HashSet<String> = {
+        let mut s = std::collections::HashSet::new();
+        s.insert("id".to_string());
+        s.insert("urgency".to_string());
+        s
+    };
+}
+
 static READ_ONLY_OPTS: [&str; 3] = ["rc.recurrence:no", "rc.gc:off", "rc.verbose=label"];
 
 fn column_label_to_type(
-    _label: &str,
-    _label2column: &std::collections::HashMap<String, String>,
+    label: &str,
+    label2column: &std::collections::HashMap<String, String>,
 ) -> anyhow::Result<ColumnType> {
-    // TODO
-    Ok(ColumnType::String)
+    match label2column.get(label) {
+        None => Err(anyhow::anyhow!("Unknown column label {}", label)),
+        Some(c) => {
+            if READ_ONLY_COLUMNS.contains(c) {
+                Ok(ColumnType::ReadOnly)
+            } else {
+                Ok(ColumnType::String)
+            }
+        }
+    }
 }
 
 fn invoke(args: &[&str]) -> anyhow::Result<String> {
@@ -70,10 +87,11 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     // with task show data.location + inotify or keep mtime
 
     let report_columns = show(&format!("report.{}.columns", report))?;
-    println!("{:?}", report_columns);
+    // TODO debug logging macro
+    println!("report_columns = {:?}", report_columns);
 
     let report_labels = show(&format!("report.{}.labels", report))?;
-    println!("{:?}", report_labels);
+    println!("report_labels = {:?}", report_labels);
     assert!(report_labels.len() == report_columns.len());
 
     let mut report_output_lines = output.lines();
@@ -113,6 +131,7 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     if !cur_label.is_empty() {
         present_labels.push(cur_label);
     }
+    println!("present_labels = {:?}", present_labels);
 
     // Split lines at column offsets
     let mut report_tasks: Vec<TaskLine> = Vec::new();
@@ -138,6 +157,7 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
         .iter()
         .map(|c| column_label_to_type(c, &label2column).unwrap()) // TODO remove unwrap
         .collect();
+    println!("column_types = {:?}", column_types);
 
     Ok(Report {
         column_types,
