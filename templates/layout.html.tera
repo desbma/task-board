@@ -9,6 +9,7 @@
     <body>
         <header>
             <h1>{{title}}</h1>
+            <!-- TODO dropdown reports / shell -->
         </header>
         <table>
         {%- for label in report.labels %}

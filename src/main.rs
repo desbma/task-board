@@ -8,6 +8,7 @@ extern crate rocket;
 
 mod assets;
 mod tw;
+#[cfg(test)] mod test;
 
 //
 // Reports
@@ -103,7 +104,7 @@ fn column_class(
 // Main
 //
 
-fn main() {
+fn rocket() -> rocket::Rocket {
     rocket::ignite()
         .attach(rocket_contrib::templates::Template::custom(
             |engines: &mut rocket_contrib::templates::Engines| {
@@ -112,5 +113,8 @@ fn main() {
         ))
         .mount("/", routes![report_default, report, asset])
         .register(catchers![not_modified])
-        .launch();
+}
+
+fn main() {
+    rocket().launch();
 }
