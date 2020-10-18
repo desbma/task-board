@@ -32,7 +32,7 @@ fn invoke(args: &[&str]) -> anyhow::Result<String> {
         .output()?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
-            "task invocation with args {:?} failed with code {}",
+            "Task invocation with args {:?} failed with code {}",
             cmd_args,
             output.status.code().unwrap()
         ));
@@ -67,7 +67,8 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     let output = invoke(&args)?;
 
     // TODO cache this until taskrc is changed
-    // TODO run this in parallel
+    // with task show data.location + inotify or keep mtime
+
     let report_columns = show(&format!("report.{}.columns", report))?;
     println!("{:?}", report_columns);
 
@@ -88,7 +89,7 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     let label_line = report_output_lines
         .next()
         .ok_or_else(|| anyhow::anyhow!("Failed to get report column labels"))?;
-    report_output_lines.next(); // Drop line after label made of - chars
+    report_output_lines.next(); // Drop line after label made of '-' chars
     let mut char_is_in_label = true;
     let mut column_char_offsets = Vec::new();
     column_char_offsets.push(0);
