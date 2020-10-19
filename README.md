@@ -27,9 +27,10 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 * Application is a single binary, with everything (including assets) in it.
 * Do one thing, and do it well: get configuration from the usual `~/.taskrc` and offer a convenient UI to interact with tasks though the `task` binary, everything else is out of scope. In other words, **this is a frontend to the `task` Taskwarrior command line tool, rather than a frontend to Taskwarrior tasks using a different model.**
 **This means all your customization in `~/.taskrc` that affects report output, priorities, etc. is respected.**
+* Race free task edition: tasks are always manipulated with their UUID, which avoids many pitfalls when tasks are renumbered
 * Minimalist presentation layer for simplicity and performance:
     * Use plain HTML as much as possible, with semantic elements.
-    * Use JavaScript only when absolutely necessary (ideally under 10 lines of code, to trigger updates).
+    * Use JavaScript only when absolutely necessary
     * Minimal use of CSS, with a ["drop in" stylesheet](https://github.com/dohliam/dropin-minimal-css#list-of-frameworks)
     * Use font icons, instead of images
 * Improve my Rust skills (which tend to get rusty for lack of practice :smirk:).

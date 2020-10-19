@@ -5,13 +5,17 @@ pub enum ColumnType {
     ReadOnly,
 }
 
-type TaskLine = Vec<String>;
+#[derive(serde::Serialize)]
+struct Task {
+    attributes: Vec<String>,
+    uuid: String,
+}
 
 #[derive(serde::Serialize)]
 pub struct Report {
     column_types: Vec<ColumnType>,
     labels: Vec<String>,
-    tasks: Vec<TaskLine>,
+    tasks: Vec<Task>,
 }
 
 lazy_static! {
@@ -87,7 +91,6 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     // with task show data.location + inotify or keep mtime
 
     let report_columns = show(&format!("report.{}.columns", report))?;
-    // TODO debug logging macro
     log::debug!("report_columns = {:?}", report_columns);
 
     let report_labels = show(&format!("report.{}.labels", report))?;
@@ -134,22 +137,25 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     log::debug!("present_labels = {:?}", present_labels);
 
     // Split lines at column offsets
-    let mut report_tasks: Vec<TaskLine> = Vec::new();
+    let mut report_tasks: Vec<Task> = Vec::new();
     for report_output_line in report_output_lines {
-        let mut task_line = TaskLine::new();
-        task_line.reserve(column_char_offsets.len());
+        let mut task_attributes = Vec::new();
+        task_attributes.reserve(column_char_offsets.len());
 
         for cur_column_char_offsets in column_char_offsets.windows(2) {
             let chunk = &report_output_line[cur_column_char_offsets[0]..cur_column_char_offsets[1]];
-            task_line.push(chunk.trim().to_string());
+            task_attributes.push(chunk.trim().to_string());
         }
 
         let last_chunk_start: usize = *column_char_offsets.last().unwrap();
         let last_chunk = &report_output_line[last_chunk_start..];
-        task_line.push(last_chunk.trim().to_string());
+        task_attributes.push(last_chunk.trim().to_string());
 
-        assert!(task_line.len() == column_char_offsets.len());
-        report_tasks.push(task_line);
+        assert!(task_attributes.len() == column_char_offsets.len());
+        report_tasks.push(Task {
+            attributes: task_attributes,
+            uuid: "TODO".to_string(),
+        });
     }
 
     // Get column types from present labels
