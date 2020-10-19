@@ -118,8 +118,14 @@ fn rocket() -> rocket::Rocket {
 
 fn main() {
     simple_logger::SimpleLogger::new()
-        .with_module_level("hyper", std::cmp::min(log::LevelFilter::Info, log::max_level()))
-        .with_module_level("mio::poll", std::cmp::min(log::LevelFilter::Info, log::max_level()))
+        .with_module_level(
+            "hyper",
+            std::cmp::min(log::LevelFilter::Info, log::max_level()),
+        )
+        .with_module_level(
+            "mio::poll",
+            std::cmp::min(log::LevelFilter::Info, log::max_level()),
+        )
         .with_module_level("_", std::cmp::min(log::LevelFilter::Info, log::max_level()))
         .init()
         .unwrap();
