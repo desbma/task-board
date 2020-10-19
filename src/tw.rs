@@ -88,10 +88,10 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
 
     let report_columns = show(&format!("report.{}.columns", report))?;
     // TODO debug logging macro
-    println!("report_columns = {:?}", report_columns);
+    log::debug!("report_columns = {:?}", report_columns);
 
     let report_labels = show(&format!("report.{}.labels", report))?;
-    println!("report_labels = {:?}", report_labels);
+    log::debug!("report_labels = {:?}", report_labels);
     assert!(report_labels.len() == report_columns.len());
 
     let mut report_output_lines = output.lines();
@@ -131,7 +131,7 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     if !cur_label.is_empty() {
         present_labels.push(cur_label);
     }
-    println!("present_labels = {:?}", present_labels);
+    log::debug!("present_labels = {:?}", present_labels);
 
     // Split lines at column offsets
     let mut report_tasks: Vec<TaskLine> = Vec::new();
@@ -157,7 +157,7 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
         .iter()
         .map(|c| column_label_to_type(c, &label2column).unwrap()) // TODO remove unwrap
         .collect();
-    println!("column_types = {:?}", column_types);
+    log::debug!("column_types = {:?}", column_types);
 
     Ok(Report {
         column_types,

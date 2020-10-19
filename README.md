@@ -43,7 +43,9 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 
 ### TODO
 
-**Everything minus what is done**
+* change task attributes from report
+* suggested values from column/type
+* web shell
 
 
 ## Install
