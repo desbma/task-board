@@ -51,9 +51,16 @@ fn invoke(args: &[&str]) -> anyhow::Result<String> {
     cmd_args.extend(&OUTPUT_OPTS);
     cmd_args.extend(args);
     log::debug!("Running command: task {}", cmd_args.join(" "));
+
+    let ts_before = std::time::Instant::now();
+
     let output = std::process::Command::new("task")
         .args(&cmd_args)
         .output()?;
+
+    let ts_after = std::time::Instant::now();
+    log::debug!("Command took {}ms to run", ts_after.duration_since(ts_before).as_millis());
+
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "Task invocation with args {:?} failed with code {}",
