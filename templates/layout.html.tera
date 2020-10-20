@@ -21,8 +21,8 @@
             </thead>
             <tbody>
             {%- for task in report.tasks %}
-                <tr>
-                {%- for attribute in task %}
+                <tr data-uuid="{{task.uuid}}">
+                {%- for attribute in task.attributes %}
                     <td class="{{report.column_types[loop.index0] | column_class}}">{{attribute}}</td>
                 {%- endfor %}
                 </tr>

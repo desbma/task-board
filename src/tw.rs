@@ -27,7 +27,7 @@ lazy_static! {
     };
 }
 
-static READ_ONLY_OPTS: [&str; 3] = ["rc.recurrence:no", "rc.gc:off", "rc.verbose=label"];
+static READ_ONLY_OPTS: [&str; 3] = ["rc.recurrence:no", "rc.gc:off", "rc.verbose=label"]; // TODO disable abbreviation?
 
 fn column_label_to_type(
     label: &str,
@@ -48,6 +48,7 @@ fn column_label_to_type(
 fn invoke(args: &[&str]) -> anyhow::Result<String> {
     let mut cmd_args: Vec<&str> = READ_ONLY_OPTS.to_vec();
     cmd_args.extend(args);
+    log::debug!("Running command: task {}", cmd_args.join(" "));
     let output = std::process::Command::new("task")
         .args(&cmd_args)
         .output()?;
@@ -59,10 +60,11 @@ fn invoke(args: &[&str]) -> anyhow::Result<String> {
         ));
     }
 
-    let stdout = std::str::from_utf8(&output.stdout)?;
+    let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars
     Ok(stdout.to_string())
 }
 
+#[allow(dead_code)]
 fn show(what: &str) -> anyhow::Result<Vec<String>> {
     let args = vec!["show", what];
     let output = invoke(&args)?;
@@ -83,20 +85,38 @@ fn show(what: &str) -> anyhow::Result<Vec<String>> {
     Err(anyhow::anyhow!("Unexpected output for {:?}", args))
 }
 
-pub fn report(report: &str) -> anyhow::Result<Report> {
-    let args = vec![report];
+fn dom_get(what: &str) -> anyhow::Result<Vec<String>> {
+    let args = vec!["_get", what];
     let output = invoke(&args)?;
 
+    Ok(output
+        .lines()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Unexpected output for {:?}", args))?
+        .split(',')
+        .map(str::to_string)
+        .collect())
+}
+
+pub fn report(report: &str) -> anyhow::Result<Report> {
+    // Get report columns & labels
     // TODO cache this until taskrc is changed
     // with task show data.location + inotify or keep mtime
-
-    let report_columns = show(&format!("report.{}.columns", report))?;
-    log::debug!("report_columns = {:?}", report_columns);
-
-    let report_labels = show(&format!("report.{}.labels", report))?;
-    log::debug!("report_labels = {:?}", report_labels);
+    let column_arg = format!("rc.report.{}.columns", report);
+    let label_arg = format!("rc.report.{}.labels", report);
+    let report_columns = dom_get(&column_arg)?;
+    log::trace!("report_columns = {:?}", report_columns);
+    let report_labels = dom_get(&label_arg)?;
+    log::trace!("report_labels = {:?}", report_labels);
     assert!(report_labels.len() == report_columns.len());
 
+    // Prepend UUID to report columns & labels
+    let mut args = vec![report];
+    let custom_columns_arg = format!("{}:uuid,{}", column_arg, report_columns.join(","));
+    args.push(&custom_columns_arg);
+    let custom_labels_arg = format!("{}:UUID,{}", label_arg, report_labels.join(","));
+    args.push(&custom_labels_arg);
+    let output = invoke(&args)?;
     let mut report_output_lines = output.lines();
 
     // Build a hashmap of label -> column
@@ -134,7 +154,6 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     if !cur_label.is_empty() {
         present_labels.push(cur_label);
     }
-    log::debug!("present_labels = {:?}", present_labels);
 
     // Split lines at column offsets
     let mut report_tasks: Vec<Task> = Vec::new();
@@ -152,18 +171,29 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
         task_attributes.push(last_chunk.trim().to_string());
 
         assert!(task_attributes.len() == column_char_offsets.len());
+
+        // Separate UUID
+        // TODO use a VecDeque to avoid expensive copy
+        let uuid = task_attributes[0].to_string();
+        task_attributes.remove(0);
+
         report_tasks.push(Task {
             attributes: task_attributes,
-            uuid: "TODO".to_string(),
+            uuid,
         });
     }
+
+    // Ignore added UUID
+    // TODO use a VecDeque to avoid expensive copy
+    present_labels.remove(0);
+    log::trace!("present_labels = {:?}", present_labels);
 
     // Get column types from present labels
     let column_types: Vec<ColumnType> = present_labels
         .iter()
         .map(|c| column_label_to_type(c, &label2column).unwrap()) // TODO remove unwrap
         .collect();
-    log::debug!("column_types = {:?}", column_types);
+    log::trace!("column_types = {:?}", column_types);
 
     Ok(Report {
         column_types,

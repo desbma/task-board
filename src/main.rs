@@ -30,7 +30,7 @@ fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http:
 fn report(
     report_name: &rocket::http::RawStr,
 ) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    let report = tw::report(report_name).or_else(|_| Err(rocket::http::Status::NotFound))?;
+    let report = tw::report(report_name).unwrap(); //or_else(|_| Err(rocket::http::Status::NotFound))?;
     let context = TemplateContext {
         title: format!("{} report", report_name),
         report,
