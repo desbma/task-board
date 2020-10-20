@@ -27,7 +27,8 @@ lazy_static! {
     };
 }
 
-static READ_ONLY_OPTS: [&str; 3] = ["rc.recurrence:no", "rc.gc:off", "rc.verbose=label"]; // TODO disable abbreviation?
+static READ_ONLY_OPTS: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
+static OUTPUT_OPTS: [&str; 3] = ["rc.defaultwidth:", "limit:", "rc.verbose=label"]; // TODO allow setting width from command line
 
 fn column_label_to_type(
     label: &str,
@@ -47,6 +48,7 @@ fn column_label_to_type(
 
 fn invoke(args: &[&str]) -> anyhow::Result<String> {
     let mut cmd_args: Vec<&str> = READ_ONLY_OPTS.to_vec();
+    cmd_args.extend(&OUTPUT_OPTS);
     cmd_args.extend(args);
     log::debug!("Running command: task {}", cmd_args.join(" "));
     let output = std::process::Command::new("task")
