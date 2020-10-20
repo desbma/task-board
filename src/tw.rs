@@ -27,8 +27,8 @@ lazy_static! {
     };
 }
 
-static READ_ONLY_OPTS: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
-static OUTPUT_OPTS: [&str; 3] = ["rc.defaultwidth:", "limit:", "rc.verbose=label"]; // TODO allow setting width from command line
+static CL_ARGS_READ_ONLY: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
+static CL_ARGS_OUTPUT: [&str; 2] = ["rc.verbose=label", "limit:4294967296"]; // 2^32
 
 fn column_label_to_type(
     label: &str,
@@ -46,9 +46,11 @@ fn column_label_to_type(
     }
 }
 
-fn invoke(args: &[&str]) -> anyhow::Result<String> {
-    let mut cmd_args: Vec<&str> = READ_ONLY_OPTS.to_vec();
-    cmd_args.extend(&OUTPUT_OPTS);
+fn invoke(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result<String> {
+    let mut cmd_args: Vec<&str> = CL_ARGS_READ_ONLY.to_vec();
+    cmd_args.extend(&CL_ARGS_OUTPUT);
+    let width_arg = &format!("rc.defaultwidth:{}", options.report_width);
+    cmd_args.push(width_arg);
     cmd_args.extend(args);
     log::debug!("Running command: task {}", cmd_args.join(" "));
 
@@ -59,7 +61,10 @@ fn invoke(args: &[&str]) -> anyhow::Result<String> {
         .output()?;
 
     let ts_after = std::time::Instant::now();
-    log::debug!("Command took {}ms to run", ts_after.duration_since(ts_before).as_millis());
+    log::debug!(
+        "Command took {}ms to run",
+        ts_after.duration_since(ts_before).as_millis()
+    );
 
     if !output.status.success() {
         return Err(anyhow::anyhow!(
@@ -74,9 +79,9 @@ fn invoke(args: &[&str]) -> anyhow::Result<String> {
 }
 
 #[allow(dead_code)]
-fn show(what: &str) -> anyhow::Result<Vec<String>> {
+fn show(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["show", what];
-    let output = invoke(&args)?;
+    let output = invoke(&args, options)?;
 
     for line in output.lines() {
         if !line.starts_with(what) {
@@ -94,9 +99,9 @@ fn show(what: &str) -> anyhow::Result<Vec<String>> {
     Err(anyhow::anyhow!("Unexpected output for {:?}", args))
 }
 
-fn dom_get(what: &str) -> anyhow::Result<Vec<String>> {
+fn dom_get(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["_get", what];
-    let output = invoke(&args)?;
+    let output = invoke(&args, options)?;
 
     Ok(output
         .lines()
@@ -107,15 +112,15 @@ fn dom_get(what: &str) -> anyhow::Result<Vec<String>> {
         .collect())
 }
 
-pub fn report(report: &str) -> anyhow::Result<Report> {
+pub fn report(report: &str, options: &crate::opts::Opts) -> anyhow::Result<Report> {
     // Get report columns & labels
     // TODO cache this until taskrc is changed
     // with task show data.location + inotify or keep mtime
     let column_arg = format!("rc.report.{}.columns", report);
     let label_arg = format!("rc.report.{}.labels", report);
-    let report_columns = dom_get(&column_arg)?;
+    let report_columns = dom_get(&column_arg, options)?;
     log::trace!("report_columns = {:?}", report_columns);
-    let report_labels = dom_get(&label_arg)?;
+    let report_labels = dom_get(&label_arg, options)?;
     log::trace!("report_labels = {:?}", report_labels);
     assert!(report_labels.len() == report_columns.len());
 
@@ -125,7 +130,7 @@ pub fn report(report: &str) -> anyhow::Result<Report> {
     args.push(&custom_columns_arg);
     let custom_labels_arg = format!("{}:UUID,{}", label_arg, report_labels.join(","));
     args.push(&custom_labels_arg);
-    let output = invoke(&args)?;
+    let output = invoke(&args, options)?;
     let mut report_output_lines = output.lines();
 
     // Build a hashmap of label -> column

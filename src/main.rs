@@ -7,6 +7,7 @@ extern crate lazy_static;
 extern crate rocket;
 
 mod assets;
+mod opts;
 #[cfg(test)]
 mod test;
 mod tw;
@@ -22,15 +23,18 @@ struct TemplateContext {
 }
 
 #[get("/")]
-fn report_default() -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    report(rocket::http::RawStr::from_str("next")) // TODO get default report dynamically?
+fn report_default(
+    options: rocket::State<opts::Opts>,
+) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
+    report(rocket::http::RawStr::from_str("next"), options) // TODO get default report dynamically?
 }
 
 #[get("/<report_name>")]
 fn report(
     report_name: &rocket::http::RawStr,
+    options: rocket::State<opts::Opts>,
 ) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
-    let report = tw::report(report_name).unwrap(); //or_else(|_| Err(rocket::http::Status::NotFound))?;
+    let report = tw::report(report_name, &*options).unwrap(); //or_else(|_| Err(rocket::http::Status::NotFound))?;
     let context = TemplateContext {
         title: format!("{} report", report_name),
         report,
@@ -105,7 +109,7 @@ fn column_class(
 // Main
 //
 
-fn rocket() -> rocket::Rocket {
+fn rocket(options: opts::Opts) -> rocket::Rocket {
     rocket::ignite()
         .attach(rocket_contrib::templates::Template::custom(
             |engines: &mut rocket_contrib::templates::Engines| {
@@ -114,9 +118,12 @@ fn rocket() -> rocket::Rocket {
         ))
         .mount("/", routes![report_default, report, asset])
         .register(catchers![not_modified])
+        .manage(options)
 }
 
 fn main() {
+    let opts = opts::get_cl_opts();
+
     simple_logger::SimpleLogger::new()
         .with_module_level(
             "hyper",
@@ -130,5 +137,5 @@ fn main() {
         .init()
         .unwrap();
 
-    rocket().launch();
+    rocket(opts).launch();
 }

@@ -24,7 +24,7 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 
 ### Technical goals
 
-* Application is a single binary, with everything (including assets) in it.
+* Application is a single binary, with everything (including assets) in it. This avoids systemd calls to open external files.
 * Do one thing, and do it well: get configuration from the usual `~/.taskrc` and offer a convenient UI to interact with tasks though the `task` binary, everything else is out of scope. In other words, **this is a frontend to the `task` Taskwarrior command line tool, rather than a frontend to Taskwarrior tasks using a different model.**
 **This means all your customization in `~/.taskrc` that affects report output, priorities, etc. is respected.**
 * Race free task edition: tasks are always manipulated with their UUID, which avoids many pitfalls when tasks are renumbered
