@@ -43,6 +43,39 @@ fn test_report_low_width() {
 }
 
 #[test]
+fn test_cmd() {
+    let client = get_test_client();
+
+    let mut response = client
+        .post("/shell")
+        .body("\"vbfqzsedmbcsdlkzf\"")
+        .header(rocket::http::ContentType::JSON)
+        .dispatch();
+    assert_eq!(response.status(), rocket::http::Status::Ok);
+    assert_eq!(
+        response.content_type(),
+        Some(rocket::http::ContentType::JSON)
+    );
+    assert_eq!(
+        response.body_string().unwrap(),
+        "{\"output\":\"\",\"code\":1}"
+    );
+
+    let mut response = client
+        .post("/shell")
+        .body("\"all\"")
+        .header(rocket::http::ContentType::JSON)
+        .dispatch();
+    assert_eq!(response.status(), rocket::http::Status::Ok);
+    assert_eq!(
+        response.content_type(),
+        Some(rocket::http::ContentType::JSON)
+    );
+    let body = response.body_string().unwrap();
+    assert!(body.ends_with(",\"code\":0}"));
+}
+
+#[test]
 fn test_asset() {
     let client = get_test_client();
     let mut response = client.get("/static/favicon.ico").dispatch();

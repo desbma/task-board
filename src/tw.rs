@@ -46,25 +46,30 @@ fn column_label_to_type(
     }
 }
 
-fn invoke(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result<String> {
-    let mut cmd_args: Vec<&str> = CL_ARGS_READ_ONLY.to_vec();
-    cmd_args.extend(&CL_ARGS_OUTPUT);
-    let width_arg = &format!("rc.defaultwidth:{}", options.report_width);
-    cmd_args.push(width_arg);
-    cmd_args.extend(args);
+fn task_output(cmd_args: &[&str]) -> anyhow::Result<std::process::Output> {
     log::debug!("Running command: task {}", cmd_args.join(" "));
 
     let ts_before = std::time::Instant::now();
 
-    let output = std::process::Command::new("task")
-        .args(&cmd_args)
-        .output()?;
+    let output = std::process::Command::new("task").args(cmd_args).output()?;
 
     let ts_after = std::time::Instant::now();
     log::debug!(
         "Command took {}ms to run",
         ts_after.duration_since(ts_before).as_millis()
     );
+
+    Ok(output)
+}
+
+fn invoke_internal(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result<String> {
+    let mut cmd_args: Vec<&str> = CL_ARGS_READ_ONLY.to_vec();
+    cmd_args.extend(&CL_ARGS_OUTPUT);
+    let width_arg = &format!("rc.defaultwidth:{}", options.report_width); // TODO remove uuid length if needed
+    cmd_args.push(width_arg);
+    cmd_args.extend(args);
+
+    let output = task_output(&cmd_args)?;
 
     if !output.status.success() {
         return Err(anyhow::anyhow!(
@@ -78,10 +83,20 @@ fn invoke(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result<String> 
     Ok(stdout.to_string())
 }
 
+pub fn invoke_external(
+    args: &[&str],
+    _options: &crate::opts::Opts,
+) -> anyhow::Result<(i32, String)> {
+    let output = task_output(args)?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars
+    Ok((output.status.code().unwrap(), stdout.to_string()))
+}
+
 #[allow(dead_code)]
 fn show(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["show", what];
-    let output = invoke(&args, options)?;
+    let output = invoke_internal(&args, options)?;
 
     for line in output.lines() {
         if !line.starts_with(what) {
@@ -101,7 +116,7 @@ fn show(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> 
 
 fn dom_get(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["_get", what];
-    let output = invoke(&args, options)?;
+    let output = invoke_internal(&args, options)?;
 
     Ok(output
         .lines()
@@ -130,7 +145,7 @@ pub fn report(report: &str, options: &crate::opts::Opts) -> anyhow::Result<Repor
     args.push(&custom_columns_arg);
     let custom_labels_arg = format!("{}:UUID,{}", label_arg, report_labels.join(","));
     args.push(&custom_labels_arg);
-    let output = invoke(&args, options)?;
+    let output = invoke_internal(&args, options)?;
     let mut report_output_lines = output.lines();
 
     // Build a hashmap of label -> column

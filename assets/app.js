@@ -1,19 +1,23 @@
 $(function() {
   // click event: wrap in form input
-  $("td.str").click(function() {
+  $(document).on("click", "td.str", function() {
     if ($(this).find("input").length > 0) {
-      return true;
+      return;
     }
 
     var inner_val = $(this).text();
-    var wrapped_val = $("<input type=\"text\"/>").val(inner_val);
+    var wrapped_val = $("<input type=\"text\"/>").val(inner_val).data("orig-val", inner_val);
     $(this).html(wrapped_val);
-    return false;
   });
 
   // input unfocus
-  $("body").on("blur", "td.str input", function() {
+  $(document).on("blur", "td.str input", function() {
     var inner_val = $(this).val();
+    var orig_val = $(this).data("orig-val");
+    if (inner_val != orig_val) {
+      // TODO AJAX
+      document.location.reload(true);
+    }
     $(this).replaceWith(inner_val);
     return true;
   });

@@ -25,7 +25,7 @@ struct TemplateContext {
 #[get("/")]
 fn report_default(
     options: rocket::State<opts::Opts>,
-) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
+) -> anyhow::Result<rocket_contrib::templates::Template> {
     report(rocket::http::RawStr::from_str("next"), options) // TODO get default report dynamically?
 }
 
@@ -33,7 +33,7 @@ fn report_default(
 fn report(
     report_name: &rocket::http::RawStr,
     options: rocket::State<opts::Opts>,
-) -> Result<rocket_contrib::templates::Template, rocket::http::Status> {
+) -> anyhow::Result<rocket_contrib::templates::Template> {
     let report = tw::report(report_name, &*options).unwrap(); //or_else(|_| Err(rocket::http::Status::NotFound))?;
     let context = TemplateContext {
         title: format!("{} report", report_name),
@@ -46,6 +46,32 @@ fn report(
 }
 
 //
+// XHR
+//
+
+#[derive(serde::Serialize)]
+struct CmdResult {
+    output: String,
+    code: i32,
+}
+
+#[post("/shell", format = "json", data = "<cmd>")]
+fn cmd(
+    cmd: rocket_contrib::json::Json<String>,
+    options: rocket::State<opts::Opts>,
+) -> anyhow::Result<rocket_contrib::json::Json<CmdResult>> {
+    let cmd_str = &cmd.to_string();
+    let cmd_split = shell_words::split(cmd_str)?;
+    let args: Vec<&str> = cmd_split.iter().map(AsRef::as_ref).collect();
+    let res = tw::invoke_external(&args[..], &options)?;
+
+    Ok(rocket_contrib::json::Json(CmdResult {
+        output: res.1,
+        code: res.0,
+    }))
+}
+
+//
 // Assets
 //
 
@@ -55,7 +81,7 @@ fn asset(path: std::path::PathBuf, last_mod: assets::IfModified) -> rocket::resp
         .clone()
         .into_os_string()
         .into_string()
-        .or_else(|_| Err(rocket::http::Status::NotFound))?;
+        .map_err(|_| rocket::http::Status::NotFound)?;
     assets::Assets::get(&filepath).map_or_else(
         || Err(rocket::http::Status::NotFound),
         |d| {
@@ -116,7 +142,7 @@ fn rocket(options: opts::Opts) -> rocket::Rocket {
                 engines.tera.register_filter("column_class", column_class);
             },
         ))
-        .mount("/", routes![report_default, report, asset])
+        .mount("/", routes![report_default, report, cmd, asset])
         .register(catchers![not_modified])
         .manage(options)
 }
