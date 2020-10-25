@@ -85,12 +85,16 @@ fn invoke_internal(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result
 
 pub fn invoke_external(
     args: &[&str],
-    _options: &crate::opts::Opts,
+    options: &crate::opts::Opts,
 ) -> anyhow::Result<(i32, String)> {
-    let output = task_output(args)?;
+    if options.dry_run {
+        Ok((0, "".to_string()))
+    } else {
+        let output = task_output(args)?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars
-    Ok((output.status.code().unwrap(), stdout.to_string()))
+        let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars
+        Ok((output.status.code().unwrap(), stdout.to_string()))
+    }
 }
 
 #[allow(dead_code)]

@@ -4,7 +4,11 @@ use structopt::StructOpt;
 #[derive(Default, StructOpt, Debug)]
 #[structopt(version=env!("CARGO_PKG_VERSION"), about="Lean and fast taskwarrior web frontend.")]
 pub struct Opts {
-    /// Report width in characater count, default is unlimited
+    /// Read only mode
+    #[structopt(short, long)]
+    pub dry_run: bool,
+
+    /// Report width in characater count, 0 means unlimited
     #[structopt(default_value, short = "w", long = "width")]
     pub report_width: usize,
 }
