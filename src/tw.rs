@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use crate::opts::Opts;
+
 #[derive(Debug, serde::Serialize, strum_macros::ToString)]
 pub enum ColumnType {
     _DateTime,
@@ -32,7 +36,7 @@ static CL_ARGS_OUTPUT: [&str; 2] = ["rc.verbose=label", "limit:4294967296"]; // 
 
 fn column_label_to_type(
     label: &str,
-    label2column: &std::collections::HashMap<String, String>,
+    label2column: &HashMap<String, String>,
 ) -> anyhow::Result<ColumnType> {
     match label2column.get(label) {
         None => Err(anyhow::anyhow!("Unknown column label {}", label)),
@@ -62,7 +66,7 @@ fn task_output(cmd_args: &[&str]) -> anyhow::Result<std::process::Output> {
     Ok(output)
 }
 
-fn invoke_internal(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result<String> {
+fn invoke_internal(args: &[&str], options: &Opts) -> anyhow::Result<String> {
     let mut cmd_args: Vec<&str> = CL_ARGS_READ_ONLY.to_vec();
     cmd_args.extend(&CL_ARGS_OUTPUT);
     let width_arg = &format!("rc.defaultwidth:{}", options.report_width); // TODO remove uuid length if needed
@@ -83,10 +87,7 @@ fn invoke_internal(args: &[&str], options: &crate::opts::Opts) -> anyhow::Result
     Ok(stdout.to_string())
 }
 
-pub fn invoke_external(
-    args: &[&str],
-    options: &crate::opts::Opts,
-) -> anyhow::Result<(i32, String)> {
+pub fn invoke_external(args: &[&str], options: &Opts) -> anyhow::Result<(i32, String)> {
     if options.dry_run {
         Ok((0, "".to_string()))
     } else {
@@ -98,7 +99,7 @@ pub fn invoke_external(
 }
 
 #[allow(dead_code)]
-fn show(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> {
+fn show(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["show", what];
     let output = invoke_internal(&args, options)?;
 
@@ -118,7 +119,7 @@ fn show(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> 
     Err(anyhow::anyhow!("Unexpected output for {:?}", args))
 }
 
-fn dom_get(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String>> {
+fn dom_get(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["_get", what];
     let output = invoke_internal(&args, options)?;
 
@@ -131,7 +132,7 @@ fn dom_get(what: &str, options: &crate::opts::Opts) -> anyhow::Result<Vec<String
         .collect())
 }
 
-pub fn report(report: &str, options: &crate::opts::Opts) -> anyhow::Result<Report> {
+pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
     // Get report columns & labels
     // TODO cache this until taskrc is changed
     // with task show data.location + inotify or keep mtime
@@ -153,8 +154,7 @@ pub fn report(report: &str, options: &crate::opts::Opts) -> anyhow::Result<Repor
     let mut report_output_lines = output.lines();
 
     // Build a hashmap of label -> column
-    let mut label2column: std::collections::HashMap<String, String> =
-        std::collections::HashMap::new();
+    let mut label2column: HashMap<String, String> = HashMap::new();
     for (label, column) in report_labels.iter().zip(report_columns.iter()) {
         label2column.insert(label.to_string(), column.to_string());
     }

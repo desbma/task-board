@@ -67,8 +67,7 @@ I *dogfood* and use this everyday, so you bet this is important to me.
 * No `unsafe` usage
 * Passes `cargo clippy` without warnings
 * Passes `cargo fmt`
-* No `use`, only explicit namespace usage inline.
-I find it more readable most of the time, and want to go to the extreme to see if it scales.
+* Minimal `use` usage, prefer explicit namespace usage inline, I find it more readable most of the time.
 
 
 ## License
