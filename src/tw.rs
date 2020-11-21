@@ -2,11 +2,19 @@ use std::collections::HashMap;
 
 use crate::opts::Opts;
 
-#[derive(Debug, serde::Serialize, strum_macros::ToString)]
-pub enum ColumnType {
+#[derive(
+    Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize, strum_macros::ToString,
+)]
+pub enum AttributeType {
     _DateTime,
+    _Numeric,
     String,
-    ReadOnly,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct ColumnType {
+    pub type_: AttributeType,
+    pub read_only: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -40,13 +48,10 @@ fn column_label_to_type(
 ) -> anyhow::Result<ColumnType> {
     match label2column.get(label) {
         None => Err(anyhow::anyhow!("Unknown column label {}", label)),
-        Some(c) => {
-            if READ_ONLY_COLUMNS.contains(c) {
-                Ok(ColumnType::ReadOnly)
-            } else {
-                Ok(ColumnType::String)
-            }
-        }
+        Some(_c) => Ok(ColumnType {
+            type_: AttributeType::String,
+            read_only: false,
+        }),
     }
 }
 

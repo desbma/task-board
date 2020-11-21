@@ -110,24 +110,31 @@ fn not_modified(_req: &rocket::request::Request) {}
 //
 
 lazy_static! {
-    static ref COLUMN_TO_CLASS: std::collections::HashMap<String, String> = {
+    static ref COLUMN_ATTRIBUTE_TYPE_TO_CLASS: std::collections::HashMap<tw::AttributeType, String> = {
         let mut m = std::collections::HashMap::new();
-        m.insert(tw::ColumnType::_DateTime.to_string(), "dt".to_string());
-        m.insert(tw::ColumnType::String.to_string(), "str".to_string());
-        m.insert(tw::ColumnType::ReadOnly.to_string(), "ro".to_string());
+        m.insert(tw::AttributeType::_DateTime, "dt".to_string());
+        m.insert(tw::AttributeType::String, "str".to_string());
         m
     };
 }
 
-fn column_class(
+fn column_html_classes(
     column: rocket_contrib::templates::tera::Value,
     _args: std::collections::HashMap<String, rocket_contrib::templates::tera::Value>,
 ) -> rocket_contrib::templates::tera::Result<rocket_contrib::templates::tera::Value> {
-    let s =
-        rocket_contrib::templates::tera::try_get_value!("column_class", "value", String, column);
-    let r = COLUMN_TO_CLASS
-        .get(&s)
-        .ok_or_else(|| format!("Unknown column {}", s))?;
+    let s = rocket_contrib::templates::tera::try_get_value!(
+        "column_classes",
+        "value",
+        tw::ColumnType,
+        column
+    );
+    let mut r = COLUMN_ATTRIBUTE_TYPE_TO_CLASS
+        .get(&s.type_)
+        .ok_or_else(|| format!("Unknown column type {:?}", s.type_))?
+        .clone();
+    if s.read_only {
+        r.extend(" ro".chars());
+    }
     Ok(rocket_contrib::templates::tera::to_value(r).unwrap())
 }
 
@@ -139,7 +146,9 @@ fn rocket(options: opts::Opts) -> rocket::Rocket {
     rocket::ignite()
         .attach(rocket_contrib::templates::Template::custom(
             |engines: &mut rocket_contrib::templates::Engines| {
-                engines.tera.register_filter("column_class", column_class);
+                engines
+                    .tera
+                    .register_filter("column_classes", column_html_classes);
             },
         ))
         .mount("/", routes![report_default, report, cmd, asset])
