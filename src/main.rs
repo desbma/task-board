@@ -112,8 +112,10 @@ fn not_modified(_req: &rocket::request::Request) {}
 lazy_static! {
     static ref COLUMN_ATTRIBUTE_TYPE_TO_CLASS: std::collections::HashMap<tw::AttributeType, String> = {
         let mut m = std::collections::HashMap::new();
-        m.insert(tw::AttributeType::_DateTime, "dt".to_string());
+        m.insert(tw::AttributeType::DateTime, "dt".to_string());
         m.insert(tw::AttributeType::String, "str".to_string());
+        m.insert(tw::AttributeType::Numeric, "num".to_string());
+        m.insert(tw::AttributeType::UDA, "str".to_string());
         m
     };
 }
@@ -133,7 +135,7 @@ fn column_html_classes(
         .ok_or_else(|| format!("Unknown column type {:?}", s.type_))?
         .clone();
     if s.read_only {
-        r.extend(" ro".chars());
+        r.push_str(" ro");
     }
     Ok(rocket_contrib::templates::tera::to_value(r).unwrap())
 }

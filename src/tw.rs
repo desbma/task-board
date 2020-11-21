@@ -1,17 +1,30 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::opts::Opts;
 
 #[derive(
-    Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize, strum_macros::ToString,
+    Clone,
+    Debug,
+    Eq,
+    Hash,
+    PartialEq,
+    serde::Deserialize,
+    serde::Serialize,
+    strum_macros::EnumString,
 )]
 pub enum AttributeType {
-    _DateTime,
-    _Numeric,
+    #[strum(serialize = "date")]
+    DateTime,
+    #[strum(serialize = "numeric")]
+    Numeric,
+    #[strum(serialize = "string")]
     String,
+    #[strum(serialize = "<type>")]
+    UDA,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct ColumnType {
     pub type_: AttributeType,
     pub read_only: bool,
@@ -31,12 +44,80 @@ pub struct Report {
 }
 
 lazy_static! {
-    static ref READ_ONLY_COLUMNS: std::collections::HashSet<String> = {
-        let mut s = std::collections::HashSet::new();
-        s.insert("id".to_string());
-        s.insert("urgency".to_string());
-        s
-    };
+    // TODO invalidate this when taskrc is changed (possible new UDA attributes?)
+    static ref COLUMNS_NAME_TO_TYPE: HashMap<String, ColumnType> =
+        build_column_name_to_type_map().unwrap();
+}
+
+fn build_column_name_to_type_map() -> anyhow::Result<HashMap<String, ColumnType>> {
+    let mut r = HashMap::new();
+
+    let output = invoke_internal(&["columns"], None, true)?;
+    let mut output_lines = output.lines();
+
+    // Compute offset for each column from first line (labels)
+    let label_lines = [
+        output_lines
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get column labels"))?,
+        output_lines
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get column labels"))?,
+    ];
+    let column_char_offsets = parse_label_lines(label_lines)?.1;
+
+    // Split lines at column offsets
+    let mut prev_parsed_line: Option<(String, ColumnType)> = None;
+    for line in output_lines {
+        if line.is_empty() {
+            break;
+        }
+
+        let mut column_attributes = Vec::new();
+        column_attributes.reserve(column_char_offsets.len());
+
+        for cur_column_char_offsets in column_char_offsets.windows(2) {
+            let chunk = &line[std::cmp::min(line.len(), cur_column_char_offsets[0])
+                ..std::cmp::min(line.len(), cur_column_char_offsets[1])];
+            column_attributes.push(chunk.trim().to_string());
+        }
+
+        let last_chunk_start: usize = *column_char_offsets.last().unwrap();
+        if last_chunk_start < line.len() {
+            let last_chunk = &line[last_chunk_start..];
+            column_attributes.push(last_chunk.trim().to_string());
+        }
+
+        // elements are in this order: Columns, Type, Modifiable, Supported Formats, Example
+        assert!(column_attributes.len() >= 4);
+
+        if column_attributes[0].is_empty() && column_attributes[3].is_empty() {
+            continue;
+        }
+
+        let (base_column_name, column_type) = if !column_attributes[0].is_empty() {
+            let type_ = AttributeType::from_str(&column_attributes[1])?;
+            let read_only = column_attributes[2] == "Read Only";
+            let column_type = ColumnType { type_, read_only };
+            (column_attributes[0].clone(), column_type)
+        } else {
+            prev_parsed_line.unwrap()
+        };
+        if column_attributes[3].ends_with('*') {
+            // Default format for this column name, we add both explicit and implicit format
+            let mut fmt = column_attributes[3].clone();
+            fmt.pop();
+            let explicit_name = format!("{}.{}", base_column_name, fmt);
+            r.insert(explicit_name, column_type.clone());
+            r.insert(base_column_name.clone(), column_type.clone());
+        } else {
+            let name = format!("{}.{}", base_column_name.clone(), column_attributes[3]);
+            r.insert(name, column_type.clone());
+        }
+        prev_parsed_line = Some((base_column_name, column_type));
+    }
+
+    Ok(r)
 }
 
 static CL_ARGS_READ_ONLY: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
@@ -48,10 +129,10 @@ fn column_label_to_type(
 ) -> anyhow::Result<ColumnType> {
     match label2column.get(label) {
         None => Err(anyhow::anyhow!("Unknown column label {}", label)),
-        Some(_c) => Ok(ColumnType {
-            type_: AttributeType::String,
-            read_only: false,
-        }),
+        Some(c) => COLUMNS_NAME_TO_TYPE
+            .get(c)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Unknown column {}", c)),
     }
 }
 
@@ -71,11 +152,22 @@ fn task_output(cmd_args: &[&str]) -> anyhow::Result<std::process::Output> {
     Ok(output)
 }
 
-fn invoke_internal(args: &[&str], options: &Opts) -> anyhow::Result<String> {
+fn invoke_internal(
+    args: &[&str],
+    options: Option<&Opts>,
+    static_report: bool,
+) -> anyhow::Result<String> {
     let mut cmd_args: Vec<&str> = CL_ARGS_READ_ONLY.to_vec();
-    cmd_args.extend(&CL_ARGS_OUTPUT);
-    let width_arg = &format!("rc.defaultwidth:{}", options.report_width); // TODO remove uuid length if needed
-    cmd_args.push(width_arg);
+    if !static_report {
+        cmd_args.extend(&CL_ARGS_OUTPUT);
+    }
+    let width = if let Some(some_options) = options {
+        some_options.report_width // TODO remove uuid length if needed
+    } else {
+        0
+    };
+    let width_args = &format!("rc.defaultwidth:{}", width);
+    cmd_args.push(width_args);
     cmd_args.extend(args);
 
     let output = task_output(&cmd_args)?;
@@ -106,7 +198,7 @@ pub fn invoke_external(args: &[&str], options: &Opts) -> anyhow::Result<(i32, St
 #[allow(dead_code)]
 fn show(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["show", what];
-    let output = invoke_internal(&args, options)?;
+    let output = invoke_internal(&args, Some(options), false)?;
 
     for line in output.lines() {
         if !line.starts_with(what) {
@@ -126,7 +218,7 @@ fn show(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
 
 fn dom_get(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
     let args = vec!["_get", what];
-    let output = invoke_internal(&args, options)?;
+    let output = invoke_internal(&args, Some(options), false)?;
 
     Ok(output
         .lines()
@@ -135,6 +227,34 @@ fn dom_get(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
         .split(',')
         .map(str::to_string)
         .collect())
+}
+
+fn parse_label_lines(label_lines: [&str; 2]) -> anyhow::Result<(Vec<String>, Vec<usize>)> {
+    let mut column_char_offsets = Vec::new();
+    column_char_offsets.push(0);
+    let mut column_iter = label_lines[1].chars();
+    let mut prev_pos = 0;
+    while let Some(pos) = column_iter.position(char::is_whitespace) {
+        let new_pos = pos + prev_pos + 1;
+        column_char_offsets.push(new_pos);
+        prev_pos = new_pos;
+    }
+    column_char_offsets.push(label_lines[1].len());
+
+    let mut labels = Vec::new();
+    for cur_column_char_offsets in column_char_offsets.windows(2) {
+        let chunk = &label_lines[0][cur_column_char_offsets[0]
+            ..std::cmp::min(label_lines[0].len(), cur_column_char_offsets[1])];
+        labels.push(chunk.trim().to_string());
+    }
+
+    log::trace!(
+        "labels = {:?}, column_char_offsets = {:?}",
+        labels,
+        column_char_offsets
+    );
+
+    Ok((labels, column_char_offsets))
 }
 
 pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
@@ -155,7 +275,7 @@ pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
     args.push(&custom_columns_arg);
     let custom_labels_arg = format!("{}:UUID,{}", label_arg, report_labels.join(","));
     args.push(&custom_labels_arg);
-    let output = invoke_internal(&args, options)?;
+    let output = invoke_internal(&args, Some(options), false)?;
     let mut report_output_lines = output.lines();
 
     // Build a hashmap of label -> column
@@ -165,33 +285,15 @@ pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
     }
 
     // Compute offset for each column from first report line (labels), and also get used labels
-    let label_line = report_output_lines
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("Failed to get report column labels"))?;
-    report_output_lines.next(); // Drop line after label made of '-' chars
-    let mut char_is_in_label = true;
-    let mut column_char_offsets = Vec::new();
-    column_char_offsets.push(0);
-    let mut present_labels = Vec::new();
-    let mut cur_label = String::new();
-    for (line_offset, c) in label_line.chars().enumerate() {
-        if c.is_ascii_whitespace() {
-            if char_is_in_label {
-                present_labels.push(cur_label.clone());
-                cur_label.clear();
-                char_is_in_label = false;
-            }
-        } else {
-            if !char_is_in_label {
-                char_is_in_label = true;
-                column_char_offsets.push(line_offset);
-            }
-            cur_label.push(c);
-        }
-    }
-    if !cur_label.is_empty() {
-        present_labels.push(cur_label);
-    }
+    let label_lines = [
+        report_output_lines
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get column labels"))?,
+        report_output_lines
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get column labels"))?,
+    ];
+    let (mut present_labels, column_char_offsets) = parse_label_lines(label_lines)?;
 
     // Split lines at column offsets
     let mut report_tasks: Vec<Task> = Vec::new();
@@ -200,20 +302,23 @@ pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
         task_attributes.reserve(column_char_offsets.len());
 
         for cur_column_char_offsets in column_char_offsets.windows(2) {
-            let chunk = &report_output_line[cur_column_char_offsets[0]..cur_column_char_offsets[1]];
+            let chunk = &report_output_line[cur_column_char_offsets[0]
+                ..std::cmp::min(report_output_line.len(), cur_column_char_offsets[1])];
             task_attributes.push(chunk.trim().to_string());
         }
 
-        let last_chunk_start: usize = *column_char_offsets.last().unwrap();
-        let last_chunk = &report_output_line[last_chunk_start..];
-        task_attributes.push(last_chunk.trim().to_string());
-
-        assert!(task_attributes.len() == column_char_offsets.len());
+        assert!(task_attributes.len() == column_char_offsets.len() - 1);
 
         // Separate UUID
         // TODO use a VecDeque to avoid expensive copy
         let uuid = task_attributes[0].to_string();
         task_attributes.remove(0);
+
+        log::trace!(
+            "task_attributes ({}) = {:?}",
+            task_attributes.len(),
+            task_attributes
+        );
 
         report_tasks.push(Task {
             attributes: task_attributes,
@@ -224,14 +329,18 @@ pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
     // Ignore added UUID
     // TODO use a VecDeque to avoid expensive copy
     present_labels.remove(0);
-    log::trace!("present_labels = {:?}", present_labels);
+    log::trace!(
+        "present_labels ({}) = {:?}",
+        present_labels.len(),
+        present_labels
+    );
 
     // Get column types from present labels
     let column_types: Vec<ColumnType> = present_labels
         .iter()
         .map(|c| column_label_to_type(c, &label2column).unwrap()) // TODO remove unwrap
         .collect();
-    log::trace!("column_types = {:?}", column_types);
+    log::trace!("column_types ({}) = {:?}", column_types.len(), column_types);
 
     Ok(Report {
         column_types,
