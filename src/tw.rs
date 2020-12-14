@@ -120,7 +120,7 @@ fn build_column_name_to_type_map() -> anyhow::Result<HashMap<String, ColumnType>
     Ok(r)
 }
 
-static CL_ARGS_READ_ONLY: [&str; 2] = ["rc.recurrence:no", "rc.gc:off"];
+static CL_ARGS_READ_ONLY: [&str; 2] = ["rc.recurrence:0", "rc.gc:0"];
 static CL_ARGS_OUTPUT: [&str; 2] = ["rc.verbose=label", "limit:4294967296"]; // 2^32
 
 fn column_label_to_type(
@@ -180,7 +180,7 @@ fn invoke_internal(
         ));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars
+    let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars, fixed in 2.5.2?
     Ok(stdout.to_string())
 }
 
@@ -190,7 +190,7 @@ pub fn invoke_external(args: &[&str], options: &Opts) -> anyhow::Result<(i32, St
     } else {
         let output = task_output(args)?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars
+        let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars, fixed in 2.5.2?
         Ok((output.status.code().unwrap(), stdout.to_string()))
     }
 }
