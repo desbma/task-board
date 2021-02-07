@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use crate::opts::Opts;
+use crate::run_opts::RunOpts;
 
 #[derive(
     Clone,
@@ -136,12 +136,25 @@ fn column_label_to_type(
     }
 }
 
-fn task_output(cmd_args: &[&str]) -> anyhow::Result<std::process::Output> {
+fn task_output(
+    cmd_args: &[&str],
+    options: Option<&RunOpts>,
+) -> anyhow::Result<std::process::Output> {
     log::debug!("Running command: task {}", cmd_args.join(" "));
 
     let ts_before = std::time::Instant::now();
 
-    let output = std::process::Command::new("task").args(cmd_args).output()?;
+    let mut cmd = std::process::Command::new("task");
+    cmd.args(cmd_args);
+    if let Some(opts) = options {
+        if let Some(task_data_dir) = &opts.task_data_dir {
+            cmd.env("TASKDATA", task_data_dir);
+        }
+    }
+
+    let output = cmd.output()?;
+
+    //println!("task {}\n{:?}", cmd_args.join(" "), output);
 
     let ts_after = std::time::Instant::now();
     log::debug!(
@@ -154,13 +167,14 @@ fn task_output(cmd_args: &[&str]) -> anyhow::Result<std::process::Output> {
 
 fn invoke_internal(
     args: &[&str],
-    options: Option<&Opts>,
+    options: Option<&RunOpts>,
     static_report: bool,
 ) -> anyhow::Result<String> {
-    let mut cmd_args: Vec<&str> = CL_ARGS_READ_ONLY.to_vec();
+    let mut cmd_args: Vec<&str> = Vec::new();
     if !static_report {
         cmd_args.extend(&CL_ARGS_OUTPUT);
     }
+    cmd_args.extend(&CL_ARGS_READ_ONLY);
     let width = if let Some(some_options) = options {
         some_options.report_width // TODO remove uuid length if needed
     } else {
@@ -170,25 +184,29 @@ fn invoke_internal(
     cmd_args.push(width_args);
     cmd_args.extend(args);
 
-    let output = task_output(&cmd_args)?;
+    let output = task_output(&cmd_args, options)?;
 
     if !output.status.success() {
-        return Err(anyhow::anyhow!(
-            "Task invocation with args {:?} failed with code {}",
-            cmd_args,
-            output.status.code().unwrap()
-        ));
+        let code = output.status.code().unwrap();
+        if (code != 1) || (!output.stdout.is_empty()) {
+            // task returns 1 with no output when having no results
+            return Err(anyhow::anyhow!(
+                "Task invocation with args {:?} failed with code {}",
+                cmd_args,
+                code
+            ));
+        }
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars, fixed in 2.5.2?
     Ok(stdout.to_string())
 }
 
-pub fn invoke_external(args: &[&str], options: &Opts) -> anyhow::Result<(i32, String)> {
+pub fn invoke_external(args: &[&str], options: &RunOpts) -> anyhow::Result<(i32, String)> {
     if options.dry_run {
         Ok((0, "".to_string()))
     } else {
-        let output = task_output(args)?;
+        let output = task_output(args, Some(options))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout); // taskwarrior incorrectly splits utf-8 chars, fixed in 2.5.2?
         Ok((output.status.code().unwrap(), stdout.to_string()))
@@ -196,7 +214,7 @@ pub fn invoke_external(args: &[&str], options: &Opts) -> anyhow::Result<(i32, St
 }
 
 #[allow(dead_code)]
-fn show(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
+fn show(what: &str, options: &RunOpts) -> anyhow::Result<Vec<String>> {
     let args = vec!["show", what];
     let output = invoke_internal(&args, Some(options), false)?;
 
@@ -216,7 +234,7 @@ fn show(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
     Err(anyhow::anyhow!("Unexpected output for {:?}", args))
 }
 
-fn dom_get(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
+fn dom_get(what: &str, options: &RunOpts) -> anyhow::Result<Vec<String>> {
     let args = vec!["_get", what];
     let output = invoke_internal(&args, Some(options), false)?;
 
@@ -229,9 +247,9 @@ fn dom_get(what: &str, options: &Opts) -> anyhow::Result<Vec<String>> {
         .collect())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn parse_label_lines(label_lines: [&str; 2]) -> anyhow::Result<(Vec<String>, Vec<usize>)> {
-    let mut column_char_offsets = Vec::new();
-    column_char_offsets.push(0);
+    let mut column_char_offsets = vec![0];
     let mut column_iter = label_lines[1].chars();
     let mut prev_pos = 0;
     while let Some(pos) = column_iter.position(char::is_whitespace) {
@@ -257,7 +275,7 @@ fn parse_label_lines(label_lines: [&str; 2]) -> anyhow::Result<(Vec<String>, Vec
     Ok((labels, column_char_offsets))
 }
 
-pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
+pub fn report(report: &str, options: &RunOpts) -> anyhow::Result<Report> {
     // Get report columns & labels
     // TODO cache this until taskrc is changed
     // with task show data.location + inotify or keep mtime
@@ -276,6 +294,15 @@ pub fn report(report: &str, options: &Opts) -> anyhow::Result<Report> {
     let custom_labels_arg = format!("{}:UUID,{}", label_arg, report_labels.join(","));
     args.push(&custom_labels_arg);
     let output = invoke_internal(&args, Some(options), false)?;
+
+    // Empty report case
+    if output.is_empty() {
+        return Ok(Report {
+            column_types: vec![],
+            labels: vec![],
+            tasks: vec![],
+        });
+    }
     let mut report_output_lines = output.lines();
 
     // Build a hashmap of label -> column

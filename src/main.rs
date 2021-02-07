@@ -7,7 +7,7 @@ extern crate lazy_static;
 extern crate rocket;
 
 mod assets;
-mod opts;
+mod run_opts;
 #[cfg(test)]
 mod test;
 mod tw;
@@ -24,15 +24,16 @@ struct TemplateContext {
 
 #[get("/")]
 fn report_default(
-    options: rocket::State<opts::Opts>,
+    options: rocket::State<run_opts::RunOpts>,
 ) -> anyhow::Result<rocket_contrib::templates::Template> {
     report(rocket::http::RawStr::from_str("next"), options) // TODO get default report dynamically?
 }
 
 #[get("/<report_name>")]
+#[allow(clippy::unnecessary_wraps)]
 fn report(
     report_name: &rocket::http::RawStr,
-    options: rocket::State<opts::Opts>,
+    options: rocket::State<run_opts::RunOpts>,
 ) -> anyhow::Result<rocket_contrib::templates::Template> {
     let report = tw::report(report_name, &*options).unwrap(); //or_else(|_| Err(rocket::http::Status::NotFound))?;
     let context = TemplateContext {
@@ -58,7 +59,7 @@ struct CmdResult {
 #[post("/shell", format = "json", data = "<cmd>")]
 fn cmd(
     cmd: rocket_contrib::json::Json<String>,
-    options: rocket::State<opts::Opts>,
+    options: rocket::State<run_opts::RunOpts>,
 ) -> anyhow::Result<rocket_contrib::json::Json<CmdResult>> {
     let cmd_str = &cmd.to_string();
     let cmd_split = shell_words::split(cmd_str)?;
@@ -144,7 +145,7 @@ fn column_html_classes(
 // Main
 //
 
-fn rocket(options: opts::Opts) -> rocket::Rocket {
+fn rocket(options: run_opts::RunOpts) -> rocket::Rocket {
     rocket::ignite()
         .attach(rocket_contrib::templates::Template::custom(
             |engines: &mut rocket_contrib::templates::Engines| {
@@ -159,7 +160,7 @@ fn rocket(options: opts::Opts) -> rocket::Rocket {
 }
 
 fn main() {
-    let opts = opts::get_cl_opts();
+    let run_opts = run_opts::get_cl_opts();
 
     simple_logger::SimpleLogger::new()
         .with_module_level(
@@ -174,5 +175,5 @@ fn main() {
         .init()
         .unwrap();
 
-    rocket(opts).launch();
+    rocket(run_opts).launch();
 }
