@@ -21,7 +21,7 @@ pub enum AttributeType {
     #[strum(serialize = "string")]
     String,
     #[strum(serialize = "<type>")]
-    UDA,
+    Uda,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

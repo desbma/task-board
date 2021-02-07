@@ -116,7 +116,7 @@ lazy_static! {
         m.insert(tw::AttributeType::DateTime, "dt".to_string());
         m.insert(tw::AttributeType::String, "str".to_string());
         m.insert(tw::AttributeType::Numeric, "num".to_string());
-        m.insert(tw::AttributeType::UDA, "str".to_string());
+        m.insert(tw::AttributeType::Uda, "str".to_string());
         m
     };
 }
