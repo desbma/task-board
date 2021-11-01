@@ -1,6 +1,16 @@
 # Task Board
 
 Simple & fast Taskwarrior web frontend
+___
+
+**This project is no longer active.**
+
+**I now realize the base concept (rely on the `task` program not only for the data model but also to format output) is not viable, because it is a very buggy and unstable interface.
+Basic stuff like unicode string truncation or new line handling is broken. Worse, the recent 2.5.x and 2.6.0 release have only added more regressions, and I have no intention to add special handling for each different `task` version.**
+
+**I recommend using the [taskwarrior-tui](https://github.com/kdheepak/taskwarrior-tui/) frontend, which manages to offer a great console UI from the unreliable mess that `task` spits out.**
+
+___
 
 ## Rationale
 
